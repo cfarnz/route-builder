@@ -1,0 +1,115 @@
+* { box-sizing: border-box; margin: 0; }
+
+:root {
+  --bg: #1c1e22;
+  --panel: #26292f;
+  --text: #e8e6e1;
+  --muted: #9a978f;
+  --accent: #e07a3f;
+  --accent-dim: #a85a2e;
+  --line: #3a3e46;
+}
+
+html, body, #app { height: 100%; }
+body {
+  font-family: -apple-system, "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app { display: flex; }
+
+#map-wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#map { flex: 1; }
+
+#profile-wrap { height: 130px; background: var(--panel); border-top: 1px solid var(--line); position: relative; }
+#profile { width: 100%; height: 100%; display: block; }
+#profile-tip {
+  position: absolute; pointer-events: none; background: #000c; color: #fff;
+  padding: 2px 8px; border-radius: 4px; font-size: 12px; transform: translate(-50%, -130%);
+  white-space: nowrap;
+}
+
+#sidebar {
+  width: 280px; background: var(--panel); border-left: 1px solid var(--line);
+  padding: 18px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
+}
+#sidebar h1 { font-size: 18px; letter-spacing: 0.04em; }
+
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.field input[type="text"] {
+  background: var(--bg); border: 1px solid var(--line); color: var(--text);
+  padding: 8px 10px; border-radius: 6px; font-size: 14px;
+}
+.field input[type="range"] { accent-color: var(--accent); }
+
+#stats { display: flex; gap: 12px; }
+.stat {
+  flex: 1; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px; text-align: center;
+}
+.stat span { font-size: 22px; font-weight: 600; }
+.stat small { display: block; color: var(--muted); margin-top: 2px; }
+
+#target-progress { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+#target-progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
+
+.btn-row { display: flex; gap: 8px; }
+.btn-col { display: flex; flex-direction: column; gap: 8px; }
+
+button {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  padding: 9px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; text-align: left;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: 0.4; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--accent-dim); }
+
+.chip { flex: 1; text-align: center; padding: 6px; }
+.chip.active { border-color: var(--accent); color: var(--accent); }
+
+#saved-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+#saved-list li {
+  display: flex; align-items: center; gap: 6px; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 13px; color: var(--text);
+}
+#saved-list li span { flex: 1; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#saved-list li span:hover { color: var(--accent); }
+#saved-list li button { padding: 2px 7px; font-size: 12px; }
+
+.hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+#discover { display: flex; flex-direction: column; gap: 12px; }
+#discover summary {
+  cursor: pointer; font-size: 13px; color: var(--muted);
+  padding: 8px 0; user-select: none;
+}
+#discover summary:hover { color: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); }
+.check small { color: var(--muted); }
+#d-results { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+#d-results li {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px; font-size: 12px; cursor: pointer; line-height: 1.5;
+}
+#d-results li:hover { border-color: var(--accent); }
+#d-results li b { font-size: 13px; }
+#d-results li .meta { color: var(--muted); }
+.badge {
+  display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px;
+  background: var(--line); margin-left: 4px;
+}
+.badge.Easy { background: #3fa06033; color: #7fd89f; }
+.badge.Moderate { background: #d9a44133; color: #eec97f; }
+.badge.Hard { background: #e07a3f33; color: #f0a37a; }
+.badge.Very.Hard, .badge.VeryHard { background: #c9414133; color: #ee8f8f; }
+
+.wp-marker {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); border: 2px solid #fff; cursor: grab;
+  box-shadow: 0 1px 4px #0008;
+}
+.wp-marker.start { background: #3fa060; }
+.maplibregl-ctrl-attrib { font-size: 10px; }

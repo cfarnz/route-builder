@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Route Builder</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="map-wrap">
+      <div id="map"></div>
+      <div id="profile-wrap">
+        <svg id="profile" preserveAspectRatio="none"></svg>
+        <div id="profile-tip" hidden></div>
+      </div>
+    </div>
+
+    <aside id="sidebar">
+      <h1>Route Builder</h1>
+
+      <label class="field">
+        <span>Route name</span>
+        <input id="route-name" type="text" placeholder="Unnamed route" />
+      </label>
+
+      <div id="stats">
+        <div class="stat"><span id="stat-dist">0.0</span><small>mi</small></div>
+        <div class="stat"><span id="stat-gain">0</span><small>ft gain</small></div>
+      </div>
+
+      <div class="field">
+        <span>Basemap</span>
+        <div class="btn-row">
+          <button id="layer-opentopo" class="chip active">OpenTopo</button>
+          <button id="layer-usgs" class="chip">USGS</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span>Target distance: <b id="target-label">10.0 mi</b></span>
+        <input id="target-slider" type="range" min="1" max="40" step="0.5" value="10" />
+        <div id="target-progress"><div id="target-progress-fill"></div></div>
+      </div>
+
+      <div class="btn-col">
+        <button id="btn-outback" disabled>&#8646; Out-and-back to target</button>
+        <button id="btn-undo" disabled>&#8617; Undo</button>
+        <button id="btn-clear" disabled>&#10005; Clear route</button>
+        <button id="btn-export" class="primary" disabled>&#11015; Export GPX</button>
+        <button id="btn-save" disabled>&#128190; Save route</button>
+      </div>
+
+      <details id="discover">
+        <summary>&#128269; Discover routes near me</summary>
+        <div class="field">
+          <span>Loop distance: <b id="d-dist-label">10 mi</b></span>
+          <input id="d-dist" type="range" min="2" max="30" step="1" value="10" />
+        </div>
+        <div class="field">
+          <span>Max difficulty: <b id="d-eff-label">Hard</b></span>
+          <input id="d-eff" type="range" min="5" max="45" step="1" value="20" />
+        </div>
+        <div class="field">
+          <span>High point: <b id="d-hp-label">5,000&ndash;14,500 ft</b></span>
+          <input id="d-hp-min" type="range" min="4000" max="14500" step="500" value="5000" />
+          <input id="d-hp-max" type="range" min="4000" max="14500" step="500" value="14500" />
+        </div>
+        <div class="field">
+          <span>Search within <b id="d-rad-label">20 mi</b> of me</span>
+          <input id="d-rad" type="range" min="2" max="120" step="2" value="20" />
+        </div>
+        <label class="check">
+          <input id="d-mountains" type="checkbox" />
+          <span>&#9968; Mountains only <small>(trailheads above 8,000 ft)</small></span>
+        </label>
+        <button id="btn-discover" class="primary">Find routes</button>
+        <div id="d-status" class="hint"></div>
+        <ul id="d-results"></ul>
+      </details>
+
+      <div class="field">
+        <span>Saved routes</span>
+        <ul id="saved-list"></ul>
+      </div>
+
+      <p class="hint">Click map to add waypoints &middot; drag to move &middot; right-click a waypoint to delete. Dashed = off-trail straight line.</p>
+    </aside>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
