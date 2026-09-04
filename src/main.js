@@ -10,6 +10,15 @@ import { onChange, ago } from './provenance.js';
 import { cacheStats, clearCache } from './cache.js';
 import { locationSummary } from './summary.js';
 import { renderCard } from './card.js';
+import {
+  registerSlopeProtocol,
+  recordSlopeSource,
+  SLOPE_TILES,
+  SLOPE_MAXZOOM,
+  SLOPE_LEGEND,
+} from './slope.js';
+
+registerSlopeProtocol();
 
 // ---------- basemaps ----------
 const BASEMAPS = {
@@ -65,6 +74,7 @@ const els = {
 
 // ---------- route layers ----------
 function ensureRouteLayers() {
+  ensureSlopeLayer(); // first, so the tint sits under the route line
   if (map.getSource('route')) return;
   map.addSource('route', { type: 'geojson', data: emptyFC() });
   map.addLayer({
@@ -97,6 +107,56 @@ function ensureRouteLayers() {
 const emptyFC = () => ({ type: 'FeatureCollection', features: [] });
 map.on('load', ensureRouteLayers);
 map.on('styledata', ensureRouteLayers); // re-add after basemap switch
+
+// ---------- slope angle overlay ----------
+// Tiles are decoded and coloured in the browser via a custom protocol, so
+// the layer is always present and only its visibility toggles. MapLibre
+// skips fetching tiles for a hidden layer, so nothing downloads until asked.
+let slopeOn = false;
+
+// Only ever called from the load/styledata handler, where adding sources is
+// legal. The toggle never adds anything, it just flips visibility.
+function ensureSlopeLayer() {
+  if (map.getSource('slope')) return;
+  map.addSource('slope', {
+    type: 'raster',
+    tiles: [SLOPE_TILES],
+    tileSize: 256,
+    maxzoom: SLOPE_MAXZOOM,
+    attribution:
+      'Slope from <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a>',
+  });
+  map.addLayer({
+    id: 'slope-layer',
+    type: 'raster',
+    source: 'slope',
+    layout: { visibility: slopeOn ? 'visible' : 'none' },
+    paint: { 'raster-opacity': 1 },
+  });
+}
+
+const slopeBtn = $('btn-slope');
+const slopeLegend = $('slope-legend');
+for (const band of SLOPE_LEGEND) {
+  const item = document.createElement('span');
+  item.className = 'legend-item';
+  const sw = document.createElement('i');
+  sw.style.background = band.color;
+  item.append(sw, document.createTextNode(band.label));
+  slopeLegend.appendChild(item);
+}
+
+slopeBtn.addEventListener('click', () => {
+  slopeOn = !slopeOn;
+  slopeBtn.classList.toggle('active', slopeOn);
+  slopeLegend.hidden = !slopeOn;
+  if (map.getLayer('slope-layer')) {
+    map.setLayoutProperty('slope-layer', 'visibility', slopeOn ? 'visible' : 'none');
+    // Decoding is async and the first paint can lag the toggle by a beat.
+    map.triggerRepaint();
+  }
+  if (slopeOn) recordSlopeSource();
+});
 
 function routeGeoJSON() {
   if (obActive) {
