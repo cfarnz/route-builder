@@ -8,6 +8,8 @@ import { listRoutes, saveRoute, deleteRoute } from './storage.js';
 import { discover, effortBucket } from './discover.js';
 import { onChange, ago } from './provenance.js';
 import { cacheStats, clearCache } from './cache.js';
+import { locationSummary } from './summary.js';
+import { renderCard } from './card.js';
 
 // ---------- basemaps ----------
 const BASEMAPS = {
@@ -139,9 +141,49 @@ function rebuildMarkers() {
 }
 
 map.on('click', (e) => {
+  const pt = [e.lngLat.lng, e.lngLat.lat];
+  if (inspectMode) return showSummary(pt);
   exitOB();
-  route.addWaypoint([e.lngLat.lng, e.lngLat.lat]);
+  route.addWaypoint(pt);
 });
+
+// ---------- inspect a point ----------
+// One tap fans out to every provider and comes back as a single card, the
+// way PeakHut's location summary does. Providers that fail drop out of the
+// card rather than failing the whole tap.
+let inspectMode = false;
+let summaryPopup = null;
+let summaryReq = 0;
+
+const inspectBtn = $('btn-inspect');
+inspectBtn.addEventListener('click', () => {
+  inspectMode = !inspectMode;
+  inspectBtn.classList.toggle('active', inspectMode);
+  inspectBtn.textContent = inspectMode ? '\u{1F4CD} Inspecting — tap the map' : '\u{1F4CD} Inspect a point';
+  map.getCanvas().style.cursor = inspectMode ? 'crosshair' : '';
+  if (!inspectMode && summaryPopup) {
+    summaryPopup.remove();
+    summaryPopup = null;
+  }
+});
+
+async function showSummary(pt) {
+  const id = ++summaryReq;
+  if (summaryPopup) summaryPopup.remove();
+
+  const loading = document.createElement('div');
+  loading.className = 'summary-card';
+  loading.textContent = 'Reading terrain…';
+  const popup = new maplibregl.Popup({ maxWidth: '320px', closeOnMove: false })
+    .setLngLat(pt)
+    .setDOMContent(loading)
+    .addTo(map);
+  summaryPopup = popup;
+
+  const summary = await locationSummary(pt);
+  if (id !== summaryReq) return; // a newer tap already won
+  popup.setDOMContent(renderCard(summary));
+}
 
 // ---------- out-and-back ----------
 function activeTrack() {

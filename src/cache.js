@@ -10,7 +10,8 @@ export const TTL = {
   elevation: 365 * 24 * 3600e3, // terrain does not move
   trailheads: 7 * 24 * 3600e3, // OSM trailhead edits land slowly
   weather: 1 * 3600e3,
-  avalanche: 3 * 3600e3,
+  avalanche: 3 * 3600e3, // CAIC issues bulletins on roughly this cadence
+  alerts: 15 * 60e3, // watches and warnings change fast, so keep this short
 };
 
 function read(key) {
