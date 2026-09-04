@@ -17,6 +17,11 @@ fighting someone else's app.
 - **Elevation profile** with hover sync to the map; live distance/gain stats
 - **GPX export** (with per-point elevation) — imports clean into COROS, Gaia, etc.
 - **Saved routes** in localStorage. No backend, no accounts, no API keys.
+- **Cached providers** — elevation points are cached indefinitely (terrain doesn't move),
+  trailhead queries for a week. When a source goes down, the last good answer is served with
+  its age shown rather than an error.
+- **Data sources panel** — every provider reports what answered, how much came from cache, and
+  how fresh it was. Green = live, blue = cached, amber = stale.
 
 ## Difficulty scoring
 
@@ -52,5 +57,13 @@ The code was the easy part. Two bugs only surfaced against real terrain:
 
 ## Roadmap
 
-Slope-angle tint + aspect overlays (avalanche planning), auto-loops from a dropped pin,
+Tap-anywhere location summary (elevation, slope, aspect, weather, avalanche danger in one card),
+CAIC avalanche integration, slope-angle tint + aspect overlays, auto-loops from a dropped pin,
 sorting discovered routes by high point, COROS workout scheduling.
+
+## Credit
+
+The caching, provenance, and geography-aware provider ideas come from Pedro Marques'
+[PeakHut](https://www.pedromarques.io/peakhut/), a backend that aggregates fourteen European
+mountain data sources behind one API. This app borrows the concepts at a much smaller scale and
+keeps everything client-side.

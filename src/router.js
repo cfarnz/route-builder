@@ -1,6 +1,9 @@
 // Routing adapter: BRouter public API with straight-line fallback.
 // Returns legs as { coords: [[lon, lat, ele], ...], straight: bool }.
 
+import { elevations } from './elevation.js';
+import { record } from './provenance.js';
+
 const BROUTER = 'https://brouter.de/brouter';
 const PROFILE = 'hiking-mountain';
 // A snapped path more than 3x the straight-line distance means the router
@@ -36,7 +39,8 @@ async function snapLeg(from, to) {
 }
 
 // Sample elevations for a straight segment so gain stats and the profile
-// stay honest off-trail. Open-Meteo allows batch lat/lon queries, no key.
+// stay honest off-trail. Goes through the cached elevation provider, so
+// re-dragging a waypoint over ground already sampled costs no requests.
 async function elevateStraight(from, to) {
   const distM = haversineM(from, to);
   const n = Math.min(60, Math.max(2, Math.round(distM / 100) + 1));
@@ -45,17 +49,8 @@ async function elevateStraight(from, to) {
     const t = i / (n - 1);
     pts.push([from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t]);
   }
-  try {
-    const lats = pts.map((p) => p[1].toFixed(5)).join(',');
-    const lons = pts.map((p) => p[0].toFixed(5)).join(',');
-    const res = await fetch(
-      `https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`
-    );
-    const { elevation } = await res.json();
-    return pts.map((p, i) => [p[0], p[1], elevation?.[i] ?? 0]);
-  } catch {
-    return pts.map((p) => [p[0], p[1], 0]);
-  }
+  const eles = await elevations(pts);
+  return pts.map((p, i) => [p[0], p[1], eles[i]]);
 }
 
 export async function routeLeg(from, to) {
@@ -63,10 +58,12 @@ export async function routeLeg(from, to) {
   try {
     const coords = await snapLeg(from, to);
     if (trackLengthM(coords) <= straightM * INDIRECT_RATIO || straightM < 50) {
+      record('Routing', { provider: 'BRouter', detail: 'snapped to trail' });
       return { coords, straight: false };
     }
+    record('Routing', { provider: 'BRouter', detail: 'no direct trail, straight line' });
   } catch {
-    /* fall through to straight line */
+    record('Routing', { provider: 'BRouter', detail: 'unreachable, straight line', stale: true });
   }
   return { coords: await elevateStraight(from, to), straight: true };
 }

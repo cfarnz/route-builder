@@ -4,6 +4,9 @@
 
 import { trackLengthM, haversineM } from './router.js';
 import { M_PER_MI, FT_PER_M } from './route.js';
+import { cached, TTL } from './cache.js';
+import { elevations } from './elevation.js';
+import { record } from './provenance.js';
 
 export const effortScore = (distMi, gainFt) => distMi + gainFt / 500;
 export const effortBucket = (s) =>
@@ -32,39 +35,49 @@ function offset([lon, lat], bearingDeg, distM) {
 // trailheads (Chautauqua ~5,700 ft) fall below, high country sits above.
 const MOUNTAIN_TRAILHEAD_FT = 8000;
 
-// Batch elevation lookup for trailhead nodes (Open-Meteo, 100 coords/request).
+// Elevations for trailhead nodes, through the cached provider.
 async function elevateNodes(nodes) {
-  for (let i = 0; i < nodes.length; i += 100) {
-    const chunk = nodes.slice(i, i + 100);
-    try {
-      const lats = chunk.map((n) => n.pt[1].toFixed(5)).join(',');
-      const lons = chunk.map((n) => n.pt[0].toFixed(5)).join(',');
-      const res = await fetch(
-        `https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`
-      );
-      const { elevation } = await res.json();
-      chunk.forEach((n, j) => (n.eleFt = (elevation?.[j] ?? 0) * FT_PER_M));
-    } catch {
-      chunk.forEach((n) => (n.eleFt = 0));
-    }
-  }
+  const eles = await elevations(nodes.map((n) => n.pt));
+  nodes.forEach((n, i) => (n.eleFt = eles[i] * FT_PER_M));
   return nodes;
+}
+
+// Overpass is rate-limited and goes down often, so trailhead queries are
+// cached for a week and keyed to a ~1 km grid: nudging your position or the
+// radius slider by a hair reuses the same answer instead of re-querying.
+async function fetchTrailheads(center, radiusMi) {
+  const key = `trailheads:${center[0].toFixed(2)},${center[1].toFixed(2)}:${Math.round(radiusMi)}`;
+  const r = Math.round(radiusMi * M_PER_MI);
+  const around = `(around:${r},${center[1]},${center[0]})`;
+  const q = `[out:json][timeout:25];(node["information"="trailhead"]${around};node["highway"="trailhead"]${around};);out 150;`;
+
+  const hit = await cached(key, TTL.trailheads, async () => {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: q,
+    });
+    if (!res.ok) throw new Error(`Overpass ${res.status}`);
+    const data = await res.json();
+    return data.elements || [];
+  });
+
+  record('Trailheads', {
+    provider: 'OSM Overpass',
+    detail: `${hit.value.length} within ${Math.round(radiusMi)} mi`,
+    at: hit.fetchedAt,
+    stale: hit.stale,
+    fromCache: hit.fromCache,
+  });
+  return hit.value;
 }
 
 // Real trailheads within radius, sampled ACROSS the whole radius — one pick
 // per distance band, so a big radius reaches the far mountains instead of
 // always anchoring on the five trailheads nearest home.
 export async function findTrailheads(center, radiusMi, limit = 5, mountainsOnly = false) {
-  const r = Math.round(radiusMi * M_PER_MI);
-  const around = `(around:${r},${center[1]},${center[0]})`;
-  const q = `[out:json][timeout:25];(node["information"="trailhead"]${around};node["highway"="trailhead"]${around};);out 150;`;
   try {
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      body: q,
-    });
-    const data = await res.json();
-    let nodes = (data.elements || []).map((n) => ({
+    const elements = await fetchTrailheads(center, radiusMi);
+    let nodes = elements.map((n) => ({
       pt: [n.lon, n.lat],
       name: n.tags?.name || 'Trailhead',
       d: haversineM(center, [n.lon, n.lat]),

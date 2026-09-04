@@ -6,6 +6,8 @@ import { downloadGPX } from './gpx.js';
 import { Profile } from './profile.js';
 import { listRoutes, saveRoute, deleteRoute } from './storage.js';
 import { discover, effortBucket } from './discover.js';
+import { onChange, ago } from './provenance.js';
+import { cacheStats, clearCache } from './cache.js';
 
 // ---------- basemaps ----------
 const BASEMAPS = {
@@ -378,6 +380,53 @@ function renderSavedList() {
     els.savedList.appendChild(li);
   }
 }
+
+// ---------- data sources ----------
+// Every provider reports what answered and how fresh it was. Cached and
+// stale answers are labelled rather than hidden, so a wrong elevation can be
+// traced to a bad source instead of guessed at.
+const srcEls = { list: $('source-list'), stats: $('cache-stats'), clear: $('btn-clear-cache') };
+
+function renderCacheStats() {
+  const { entries, points, bytes } = cacheStats();
+  srcEls.stats.textContent = entries
+    ? `${points.toLocaleString()} elevation points · ${Math.round(bytes / 1024)} KB cached`
+    : 'Cache empty';
+  srcEls.clear.disabled = !entries;
+}
+
+onChange((sources) => {
+  srcEls.list.innerHTML = '';
+  if (!sources.length) {
+    const li = document.createElement('li');
+    li.className = 'src empty';
+    li.textContent = 'Nothing fetched yet';
+    srcEls.list.appendChild(li);
+  }
+  for (const s of sources) {
+    const li = document.createElement('li');
+    li.className = 'src ' + (s.stale ? 'stale' : s.fromCache ? 'cached' : 'live');
+    const head = document.createElement('b');
+    head.textContent = s.name;
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = [s.provider, s.detail].filter(Boolean).join(' · ');
+    const when = document.createElement('span');
+    when.className = 'meta when';
+    when.textContent = (s.stale ? 'stale · ' : '') + ago(s.at);
+    li.append(head, meta, when);
+    srcEls.list.appendChild(li);
+  }
+  renderCacheStats();
+});
+
+srcEls.clear.addEventListener('click', () => {
+  if (confirm('Clear all cached elevation and trailhead data? Saved routes are not affected.')) {
+    clearCache();
+    renderCacheStats();
+  }
+});
+renderCacheStats();
 
 // ---------- render ----------
 function render() {
