@@ -48,10 +48,11 @@ export class Profile {
     const line = this.points.map((p, i) => `${i ? 'L' : 'M'}${x(p.distMi).toFixed(1)},${y(p.eleFt).toFixed(1)}`).join('');
     const area = `${line}L${x(maxD).toFixed(1)},${H - PAD}L${PAD},${H - PAD}Z`;
 
+    // Colors come from the stylesheet, not from here.
     this.svg.innerHTML =
-      `<path d="${area}" fill="#e07a3f33"/>` +
-      `<path d="${line}" fill="none" stroke="#e07a3f" stroke-width="2"/>` +
-      `<line id="cursor" x1="0" x2="0" y1="${PAD}" y2="${H - PAD}" stroke="#fff8" stroke-width="1" visibility="hidden"/>`;
+      `<path class="profile-area" d="${area}"/>` +
+      `<path class="profile-line" d="${line}"/>` +
+      `<line id="cursor" class="profile-cursor" x1="0" x2="0" y1="${PAD}" y2="${H - PAD}" visibility="hidden"/>`;
   }
 
   hover(e) {

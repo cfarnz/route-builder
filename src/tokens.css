@@ -1,0 +1,261 @@
+/* ==========================================================================
+   Clay's UI tokens — "field instrument"
+   Drop this in, import it first, build everything on top of it.
+   Extracted from route-builder and Case-studies, with motion values from
+   Emil Kowalski's design engineering rules.
+   ========================================================================== */
+
+:root {
+  /* ---- neutrals: warm, not blue-gray. Four steps is enough. ---- */
+  --bg-0: #131518; /* page */
+  --bg-1: #1a1d22; /* panel, card, sidebar */
+  --bg-2: #22262c; /* input, raised control, hover fill */
+  --line: #31353f; /* hairline borders */
+
+  --text: #e8e6e1; /* warm off-white, never pure #fff */
+  --text-dim: #9a978f; /* labels, units, secondary */
+  --text-faint: #6d6a64; /* placeholders, disabled */
+
+  /* ---- one accent. Warm. Everything else is semantic. ---- */
+  --accent: #e07a3f;
+  --accent-hover: #ef8b4f;
+  --accent-fill: #e07a3f26; /* 15% — tinted backgrounds */
+  --on-accent: #14161a; /* text on a filled accent surface */
+
+  /* ---- semantic: only for meaning, never decoration ---- */
+  --ok: #3fa060;
+  --warn: #d9a441;
+  --danger: #c94141;
+  --info: #4f9de0;
+  /* soft variants for badge/pill backgrounds */
+  --ok-fill: #3fa06026;
+  --warn-fill: #d9a44126;
+  --danger-fill: #c9414126;
+  --info-fill: #4f9de026;
+  /* lifted variants for semantic TEXT on a dark ground — the base colors are
+     tuned for borders and fills and read too dark as type. */
+  --ok-text: #7fd89f;
+  --warn-text: #eec97f;
+  --danger-text: #ee8f8f;
+  --info-text: #8fc4f0;
+  --accent-text: #f0a37a;
+
+  /* ---- type ---- */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Tracking is size-specific. Large text tightens, small text opens up.
+     A single letter-spacing value is wrong somewhere. */
+  --text-xs: 0.6875rem; /* 11px — units, meta, legends */
+  --text-sm: 0.8125rem; /* 13px — labels, controls */
+  --text-base: 0.9375rem; /* 15px — body */
+  --text-lg: 1.125rem; /* 18px — section heads */
+  --text-xl: 1.5rem; /* 24px — page title */
+  --text-2xl: 2rem; /* 32px — hero number */
+
+  --track-xs: 0.01em;
+  --track-sm: 0;
+  --track-base: 0;
+  --track-lg: -0.01em;
+  --track-xl: -0.015em;
+  --track-2xl: -0.022em;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.4;
+  --leading-body: 1.55;
+
+  /* ---- space: 4px base, no in-between values ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+
+  /* ---- radius ---- */
+  --r-control: 6px; /* buttons, inputs, chips */
+  --r-card: 8px; /* cards, list rows */
+  --r-surface: 12px; /* panels, popovers, sheets */
+  --r-pill: 999px;
+
+  /* ---- elevation: translucent shadow, never a solid border for depth ---- */
+  --shadow-1: 0 1px 2px #0006;
+  --shadow-2: 0 4px 12px #0007;
+  --shadow-3: 0 8px 28px #0009;
+
+  /* ---- motion ----
+     Custom curves. The CSS built-ins are too weak to read as intentional. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* enter/exit — the default */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* on-screen movement */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* sheets, drawers */
+
+  --dur-press: 140ms; /* button feedback */
+  --dur-tip: 160ms; /* tooltips, small popovers */
+  --dur-menu: 200ms; /* dropdowns, selects */
+  --dur-panel: 280ms; /* modals, drawers, sheets */
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every number is mono and tabular so digits don't jitter as values change.
+   This is the single most identifiable thing about these interfaces. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Units ride along with the number, dimmed and smaller. Never bare digits. */
+.unit {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  margin-left: 0.15em;
+}
+
+/* ==========================================================================
+   Pressables — anything clickable confirms it heard you
+   ========================================================================== */
+
+.btn {
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  padding: var(--sp-2) var(--sp-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    border-color var(--dur-press) ease,
+    background var(--dur-press) ease;
+}
+
+/* Hover motion is gated: touch devices fire hover on tap and it sticks. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+}
+
+/* Feedback on press-down, not on release. Waiting for click feels dead. */
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn--primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+}
+
+/* Selected state is a fill, not just a border. A border alone is
+   indistinguishable from :hover, which makes state unreadable. */
+.btn--active {
+  background: var(--accent-fill);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+:where(button, a, [role='button']):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Surfaces
+   ========================================================================== */
+
+.card {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: var(--sp-3);
+}
+
+.panel {
+  background: var(--bg-1);
+  border-radius: var(--r-surface);
+  box-shadow: var(--shadow-2);
+}
+
+/* Popovers scale from their trigger, not their center. Modals are the
+   exception — they aren't anchored to anything, so they stay centered. */
+.popover {
+  transform-origin: var(--transform-origin, center);
+  transition:
+    opacity var(--dur-menu) var(--ease-out),
+    transform var(--dur-menu) var(--ease-out);
+}
+
+@starting-style {
+  .popover {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* ==========================================================================
+   Status — provenance is a first-class UI element, not a debug affordance
+   ========================================================================== */
+
+.status {
+  border-left: 3px solid var(--line);
+  padding-left: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+.status--live { border-left-color: var(--ok); }
+.status--cached { border-left-color: var(--info); }
+.status--stale { border-left-color: var(--warn); }
+.status--error { border-left-color: var(--danger); }
+
+/* ==========================================================================
+   Reduced motion — gentler, not none. Keep what aids comprehension.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Opacity-only transitions still carry meaning, so allow them back. */
+  .popover,
+  .toast {
+    transition: opacity 200ms ease !important;
+    transform: none !important;
+  }
+}

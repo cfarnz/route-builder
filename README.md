@@ -36,6 +36,13 @@ fighting someone else's app.
 - **Data sources panel** — every provider reports what answered, how much came from cache, and
   how fresh it was. Green = live, blue = cached, amber = stale.
 
+## Design
+
+Built on [clay-ui](https://github.com/cfarnz/clay-ui) ("Field Instrument") — `src/tokens.css` is
+a copy from that repo. Every color, duration, spacing and radius comes from a token; a raw hex in
+`style.css` is a bug. Measurements render in tabular monospace so digits hold their column as
+values change.
+
 ## Difficulty scoring
 
 `effort = miles + (elevation gain in feet / 500)` — a flat 10-miler ≈ 10, a 7-miler with
