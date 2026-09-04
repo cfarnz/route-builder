@@ -161,6 +161,11 @@ button.active { border-color: var(--accent); color: var(--accent); }
 .card-note { color: var(--muted); font-size: 11px; margin-top: 5px; }
 .card-note.warn { color: #eec97f; }
 .card-note.danger { color: #ee8f8f; }
+.card-disclaimer {
+  border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px;
+  font-size: 10.5px; line-height: 1.45; color: var(--muted);
+}
+.card-disclaimer b { color: #eec97f; }
 
 .wp-marker {
   width: 14px; height: 14px; border-radius: 50%;

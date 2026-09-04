@@ -108,5 +108,17 @@ export function renderCard(summary) {
     }
   }
 
+  // Always last, always present. A slope angle and a danger rating shown
+  // together read as a recommendation unless something says otherwise.
+  const disc = el('p', 'card-disclaimer');
+  disc.append(
+    el('b', null, 'Not an avalanche forecast. '),
+    document.createTextNode(
+      'This is reference data from automated sources. Read the full CAIC bulletin ' +
+        'and make your own field observations before committing to terrain.'
+    )
+  );
+  card.appendChild(disc);
+
   return card;
 }
