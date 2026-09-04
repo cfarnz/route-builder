@@ -6,33 +6,33 @@
 // card with elevation and no avalanche bulletin still beats no card.
 
 import { cached, TTL } from './cache.js';
-import { elevations } from './elevation.js';
+import { preciseElevations, pickProvider } from './elevation.js';
 import { record } from './provenance.js';
 
 const FT_PER_M = 3.28084;
 
 // ---------- terrain ----------
 // Slope and aspect from a 3x3 elevation grid (Horn's method, as used by
-// ESRI). Spacing matches the ~90 m DEM behind Open-Meteo: sampling tighter
-// than the source resolution invents detail that isn't there.
-const DEM_SPACING_M = 90;
-
+// ESRI). The resolver decides both which provider answers and how far apart
+// to sample: 30 m against 3DEP, 90 m against Open-Meteo.
 async function terrain([lon, lat]) {
+  const picked = pickProvider([lon, lat]);
+  const step = picked.spacingM;
   const mPerDegLat = 111320;
   const mPerDegLon = 111320 * Math.cos((lat * Math.PI) / 180);
-  const dLat = DEM_SPACING_M / mPerDegLat;
-  const dLon = DEM_SPACING_M / mPerDegLon;
+  const dLat = step / mPerDegLat;
+  const dLon = step / mPerDegLon;
 
   // Rows north → south, columns west → east.
   const grid = [];
   for (let i = -1; i <= 1; i++) {
     for (let j = -1; j <= 1; j++) grid.push([lon + j * dLon, lat - i * dLat]);
   }
-  const z = await elevations(grid);
+  const { values: z, provider, resolutionM } = await preciseElevations(grid);
   const [a, b, c, d, , f, g, h, i] = z;
 
-  const dzdx = (c + 2 * f + i - (a + 2 * d + g)) / (8 * DEM_SPACING_M);
-  const dzdy = (g + 2 * h + i - (a + 2 * b + c)) / (8 * DEM_SPACING_M);
+  const dzdx = (c + 2 * f + i - (a + 2 * d + g)) / (8 * step);
+  const dzdy = (g + 2 * h + i - (a + 2 * b + c)) / (8 * step);
 
   const slopeDeg = (Math.atan(Math.hypot(dzdx, dzdy)) * 180) / Math.PI;
 
@@ -46,6 +46,9 @@ async function terrain([lon, lat]) {
     slopeDeg,
     // Flat ground has no meaningful aspect.
     aspectDeg: slopeDeg < 1 ? null : aspect % 360,
+    demProvider: provider,
+    demResolutionM: resolutionM,
+    spacingM: step,
   };
 }
 

@@ -56,7 +56,14 @@ export function renderCard(summary) {
     if (band === 'avy') {
       s.appendChild(el('p', 'card-note warn', 'In the 30–45° band where most slab avalanches release.'));
     }
-    s.appendChild(el('p', 'card-note', 'Slope and aspect derived from a ~90 m DEM. Treat as approximate.'));
+    s.appendChild(
+      el(
+        'p',
+        'card-note',
+        `Derived from ${terrain.demProvider} at ${terrain.demResolutionM} m, ` +
+          `sampled ${terrain.spacingM} m apart. Treat as approximate.`
+      )
+    );
   }
 
   // ---------- weather ----------

@@ -20,6 +20,10 @@ fighting someone else's app.
 - **Inspect a point** — tap anywhere for a single card: elevation, slope angle, aspect, current
   weather and 3-day precip, active NWS alerts, and the CAIC avalanche zone and danger rating.
   Slopes in the 30–45° band get flagged, since that's where most slab avalanches release
+- **Geography-aware elevation** — a resolver picks the provider by location and by what the
+  caller needs. Summary cards get USGS 3DEP at 1 m (US only, one point per request); routes and
+  Discover get Open-Meteo at ~90 m (global, 100 points per request). 3DEP failures fall back
+  per-point rather than emptying the card
 - **Cached providers** — elevation points are cached indefinitely (terrain doesn't move),
   trailhead queries for a week. When a source goes down, the last good answer is served with
   its age shown rather than an error.
@@ -36,7 +40,10 @@ fighting someone else's app.
 Vite + vanilla JS + [MapLibre GL](https://maplibre.org/). Routing and elevation from free public
 services: [BRouter](https://brouter.de) (mountain-hiking profile — returns elevation per point),
 [Overpass API](https://overpass-api.de) (trailhead search), [Open-Meteo](https://open-meteo.com)
-(elevation for off-trail segments). MapLibre was chosen over Leaflet for raster-DEM support —
+(bulk elevation), [USGS 3DEP](https://epqs.nationalmap.gov) (1 m elevation for summary cards),
+[NWS](https://api.weather.gov) (active alerts), and the
+[National Avalanche Center API](https://api.avalanche.org) (CAIC zones and danger).
+MapLibre was chosen over Leaflet for raster-DEM support —
 slope-angle and aspect overlays are on the roadmap.
 
 ## Run it
