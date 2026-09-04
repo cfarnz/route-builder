@@ -17,11 +17,12 @@ fighting someone else's app.
 - **Elevation profile** with hover sync to the map; live distance/gain stats
 - **GPX export** (with per-point elevation) — imports clean into COROS, Gaia, etc.
 - **Saved routes** in localStorage. No backend, no accounts, no API keys.
-- **Slope-angle tint** — colours terrain by steepness, with the 30–45° slab-avalanche band
-  carrying the loudest colours and anything under 27° left clear. Elevation tiles come from
-  [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Terrarium, no key) and the
-  slope is computed per pixel in the browser through a custom MapLibre protocol, since MapLibre
-  ships hillshade but nothing that colours by angle
+- **Terrain overlays** — slope angle and aspect, one at a time. Slope puts the loudest colours on
+  the 30–45° slab-avalanche band and leaves anything under 27° clear; aspect colours eight compass
+  sectors on a wheel so opposing faces read as opposing colours, on slopes over 20°. Elevation
+  tiles come from [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Terrarium, no
+  key) and both are computed per pixel in the browser through a custom MapLibre protocol, since
+  MapLibre ships hillshade but nothing that colours by angle or direction
 - **Inspect a point** — tap anywhere for a single card: elevation, slope angle, aspect, current
   weather and 3-day precip, active NWS alerts, and the CAIC avalanche zone and danger rating.
   Slopes in the 30–45° band get flagged, since that's where most slab avalanches release

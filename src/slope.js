@@ -1,10 +1,10 @@
-// Slope-angle tint, computed in the browser.
+// Terrain overlays (slope angle, aspect), computed in the browser.
 //
 // MapLibre ships a hillshade layer for raster-DEM sources but nothing that
-// colours by slope angle, so this registers a custom protocol: MapLibre asks
-// for slope://…/{z}/{x}/{y}.png, we fetch the matching Terrarium elevation
-// tile, decode it, run Horn's method per pixel, and hand back a PNG of
-// coloured slope.
+// colours by slope or aspect, so each overlay registers a custom protocol:
+// MapLibre asks for slope://…/{z}/{x}/{y}.png, we fetch the matching
+// Terrarium elevation tile, decode it, run Horn's method per pixel, and hand
+// back a PNG of coloured terrain.
 //
 // Terrarium tiles come from AWS Open Data — no key, CORS open — which keeps
 // the app a static site.
@@ -12,18 +12,18 @@
 import maplibregl from 'maplibre-gl';
 import { record } from './provenance.js';
 
-const TERRARIUM_HOST = 's3.amazonaws.com/elevation-tiles-prod/terrarium';
-export const SLOPE_TILES = `slope://${TERRARIUM_HOST}/{z}/{x}/{y}.png`;
+const HOST = 's3.amazonaws.com/elevation-tiles-prod/terrarium';
 // Terrarium publishes to z15. Past the source zoom the extra detail is
-// interpolation, so let MapLibre overzoom rather than inventing slope.
-export const SLOPE_MAXZOOM = 14;
+// interpolation, so let MapLibre overzoom rather than inventing terrain.
+export const OVERLAY_MAXZOOM = 14;
 
 const TILE_RE = /\/(\d+)\/(\d+)\/(\d+)\.png$/;
+const ALPHA = 120; // ~47%, enough to read contours through
 
 // Slope bands. Most slab avalanches release between 30 and 45 degrees, so
 // that range carries the loudest colours; below 27 stays clear so the topo
 // underneath reads normally.
-const BANDS = [
+const SLOPE_BANDS = [
   [27, [242, 224, 74]], // 27–30  yellow
   [30, [240, 160, 60]], // 30–35  orange
   [35, [227, 79, 60]], // 35–40  red, the heart of the slab band
@@ -31,16 +31,47 @@ const BANDS = [
   [45, [138, 62, 158]], // 45–50  purple
   [50, [70, 78, 150]], // 50+    blue
 ];
-const ALPHA = 120; // ~47%, enough to read contours through
 
-export const SLOPE_LEGEND = [
-  { label: '27–30°', color: 'rgb(242,224,74)' },
-  { label: '30–35°', color: 'rgb(240,160,60)' },
-  { label: '35–40°', color: 'rgb(227,79,60)' },
-  { label: '40–45°', color: 'rgb(186,48,92)' },
-  { label: '45–50°', color: 'rgb(138,62,158)' },
-  { label: '50°+', color: 'rgb(70,78,150)' },
+// Eight compass sectors on a colour wheel, so opposing aspects read as
+// opposing colours. North is blue (holds snow, stays cold), south is amber.
+const ASPECT_SECTORS = [
+  [74, 127, 212], // N
+  [70, 179, 196], // NE
+  [79, 179, 106], // E
+  [168, 188, 74], // SE
+  [224, 168, 60], // S
+  [224, 102, 60], // SW
+  [201, 73, 143], // W
+  [131, 85, 196], // NW
 ];
+// Flat ground has no meaningful aspect, so the overlay only paints terrain
+// steep enough for the direction to mean something.
+const ASPECT_MIN_SLOPE = 20;
+
+export const OVERLAYS = {
+  slope: {
+    label: '▲ Slope',
+    tiles: `slope://${HOST}/{z}/{x}/{y}.png`,
+    legend: [
+      { label: '27–30°', color: 'rgb(242,224,74)' },
+      { label: '30–35°', color: 'rgb(240,160,60)' },
+      { label: '35–40°', color: 'rgb(227,79,60)' },
+      { label: '40–45°', color: 'rgb(186,48,92)' },
+      { label: '45–50°', color: 'rgb(138,62,158)' },
+      { label: '50°+', color: 'rgb(70,78,150)' },
+    ],
+    note: 'Loudest colours mark 30–45°, where most slab avalanches release.',
+  },
+  aspect: {
+    label: '◔ Aspect',
+    tiles: `aspect://${HOST}/{z}/{x}/{y}.png`,
+    legend: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'].map((label, i) => ({
+      label,
+      color: `rgb(${ASPECT_SECTORS[i].join(',')})`,
+    })),
+    note: `Shown on slopes over ${ASPECT_MIN_SLOPE}°. Flatter ground has no meaningful aspect.`,
+  },
+};
 
 // Ground distance covered by one pixel, which is the cell size Horn's method
 // needs. Web Mercator stretches with latitude, so this is per-tile.
@@ -63,15 +94,32 @@ function toBlob(canvas) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
-async function renderSlopeTile(params, abortController) {
+function slopeColour(deg) {
+  if (deg < SLOPE_BANDS[0][0]) return null;
+  for (let k = SLOPE_BANDS.length - 1; k >= 0; k--) {
+    if (deg >= SLOPE_BANDS[k][0]) return SLOPE_BANDS[k][1];
+  }
+  return null;
+}
+
+// ESRI's aspect convention: 0 is north, increasing clockwise.
+function aspectColour(deg, dzdx, dzdy) {
+  if (deg < ASPECT_MIN_SLOPE) return null;
+  let a = (Math.atan2(dzdy, -dzdx) * 180) / Math.PI;
+  if (a < 0) a = 90 - a;
+  else if (a > 90) a = 360 - a + 90;
+  else a = 90 - a;
+  return ASPECT_SECTORS[Math.round((a % 360) / 45) % 8];
+}
+
+async function renderTile(params, abortController, mode) {
   const m = params.url.match(TILE_RE);
-  if (!m) throw new Error('bad slope tile url');
+  if (!m) throw new Error('bad overlay tile url');
   const z = +m[1];
   const y = +m[3];
 
-  const res = await fetch(params.url.replace(/^slope:\/\//, 'https://'), {
-    signal: abortController.signal,
-  });
+  const src_url = params.url.replace(/^[a-z]+:\/\//, 'https://');
+  const res = await fetch(src_url, { signal: abortController.signal });
   if (!res.ok) throw new Error(`Terrarium ${res.status}`);
 
   const bmp = await createImageBitmap(await res.blob());
@@ -112,14 +160,9 @@ async function renderSlopeTile(params, abortController) {
       const dzdy = (g + 2 * hh + i2 - (a + 2 * b + c)) / (8 * cell);
       const deg = (Math.atan(Math.hypot(dzdx, dzdy)) * 180) / Math.PI;
 
-      if (deg < BANDS[0][0]) continue; // leave it transparent
-      let colour = BANDS[BANDS.length - 1][1];
-      for (let k = BANDS.length - 1; k >= 0; k--) {
-        if (deg >= BANDS[k][0]) {
-          colour = BANDS[k][1];
-          break;
-        }
-      }
+      const colour = mode === 'aspect' ? aspectColour(deg, dzdx, dzdy) : slopeColour(deg);
+      if (!colour) continue; // leave it transparent
+
       const p = (yy * w + x) * 4;
       dst[p] = colour[0];
       dst[p + 1] = colour[1];
@@ -133,14 +176,16 @@ async function renderSlopeTile(params, abortController) {
 }
 
 let registered = false;
-export function registerSlopeProtocol() {
+export function registerOverlayProtocols() {
   if (registered) return;
-  maplibregl.addProtocol('slope', renderSlopeTile);
+  for (const mode of Object.keys(OVERLAYS)) {
+    maplibregl.addProtocol(mode, (params, ac) => renderTile(params, ac, mode));
+  }
   registered = true;
 }
 
-export function recordSlopeSource() {
-  record('Slope', {
+export function recordOverlaySource(mode) {
+  record(mode === 'aspect' ? 'Aspect' : 'Slope', {
     provider: 'AWS Terrain Tiles',
     detail: 'Terrarium DEM, computed in browser',
   });

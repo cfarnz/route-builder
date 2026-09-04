@@ -11,14 +11,13 @@ import { cacheStats, clearCache } from './cache.js';
 import { locationSummary } from './summary.js';
 import { renderCard } from './card.js';
 import {
-  registerSlopeProtocol,
-  recordSlopeSource,
-  SLOPE_TILES,
-  SLOPE_MAXZOOM,
-  SLOPE_LEGEND,
+  registerOverlayProtocols,
+  recordOverlaySource,
+  OVERLAYS,
+  OVERLAY_MAXZOOM,
 } from './slope.js';
 
-registerSlopeProtocol();
+registerOverlayProtocols();
 
 // ---------- basemaps ----------
 const BASEMAPS = {
@@ -74,7 +73,7 @@ const els = {
 
 // ---------- route layers ----------
 function ensureRouteLayers() {
-  ensureSlopeLayer(); // first, so the tint sits under the route line
+  ensureOverlayLayers(); // first, so the tints sit under the route line
   if (map.getSource('route')) return;
   map.addSource('route', { type: 'geojson', data: emptyFC() });
   map.addLayer({
@@ -108,55 +107,81 @@ const emptyFC = () => ({ type: 'FeatureCollection', features: [] });
 map.on('load', ensureRouteLayers);
 map.on('styledata', ensureRouteLayers); // re-add after basemap switch
 
-// ---------- slope angle overlay ----------
+// ---------- terrain overlays ----------
 // Tiles are decoded and coloured in the browser via a custom protocol, so
-// the layer is always present and only its visibility toggles. MapLibre
-// skips fetching tiles for a hidden layer, so nothing downloads until asked.
-let slopeOn = false;
+// the layers are always present and only visibility toggles. MapLibre skips
+// fetching tiles for a hidden layer, so nothing downloads until asked.
+//
+// Only one overlay shows at a time: two translucent tints stacked produce a
+// colour that means neither thing. Clicking the active one turns it off.
+let activeOverlay = null;
 
 // Only ever called from the load/styledata handler, where adding sources is
-// legal. The toggle never adds anything, it just flips visibility.
-function ensureSlopeLayer() {
-  if (map.getSource('slope')) return;
-  map.addSource('slope', {
-    type: 'raster',
-    tiles: [SLOPE_TILES],
-    tileSize: 256,
-    maxzoom: SLOPE_MAXZOOM,
-    attribution:
-      'Slope from <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a>',
-  });
-  map.addLayer({
-    id: 'slope-layer',
-    type: 'raster',
-    source: 'slope',
-    layout: { visibility: slopeOn ? 'visible' : 'none' },
-    paint: { 'raster-opacity': 1 },
-  });
-}
-
-const slopeBtn = $('btn-slope');
-const slopeLegend = $('slope-legend');
-for (const band of SLOPE_LEGEND) {
-  const item = document.createElement('span');
-  item.className = 'legend-item';
-  const sw = document.createElement('i');
-  sw.style.background = band.color;
-  item.append(sw, document.createTextNode(band.label));
-  slopeLegend.appendChild(item);
-}
-
-slopeBtn.addEventListener('click', () => {
-  slopeOn = !slopeOn;
-  slopeBtn.classList.toggle('active', slopeOn);
-  slopeLegend.hidden = !slopeOn;
-  if (map.getLayer('slope-layer')) {
-    map.setLayoutProperty('slope-layer', 'visibility', slopeOn ? 'visible' : 'none');
-    // Decoding is async and the first paint can lag the toggle by a beat.
-    map.triggerRepaint();
+// legal. The toggles never add anything, they just flip visibility.
+function ensureOverlayLayers() {
+  for (const [key, cfg] of Object.entries(OVERLAYS)) {
+    if (map.getSource(key)) continue;
+    map.addSource(key, {
+      type: 'raster',
+      tiles: [cfg.tiles],
+      tileSize: 256,
+      maxzoom: OVERLAY_MAXZOOM,
+      attribution:
+        'Terrain from <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a>',
+    });
+    map.addLayer({
+      id: `${key}-layer`,
+      type: 'raster',
+      source: key,
+      layout: { visibility: activeOverlay === key ? 'visible' : 'none' },
+      paint: { 'raster-opacity': 1 },
+    });
   }
-  if (slopeOn) recordSlopeSource();
-});
+}
+
+const overlayBtns = { slope: $('btn-slope'), aspect: $('btn-aspect') };
+const overlayLegend = $('overlay-legend');
+const overlayNote = $('overlay-note');
+
+function renderOverlayUI() {
+  for (const [key, btn] of Object.entries(overlayBtns)) {
+    btn.textContent = OVERLAYS[key].label;
+    btn.classList.toggle('active', activeOverlay === key);
+  }
+  const cfg = activeOverlay ? OVERLAYS[activeOverlay] : null;
+  overlayLegend.hidden = !cfg;
+  overlayNote.hidden = !cfg;
+  overlayLegend.innerHTML = '';
+  if (!cfg) return;
+  for (const band of cfg.legend) {
+    const item = document.createElement('span');
+    item.className = 'legend-item';
+    const sw = document.createElement('i');
+    sw.style.background = band.color;
+    item.append(sw, document.createTextNode(band.label));
+    overlayLegend.appendChild(item);
+  }
+  overlayNote.textContent = cfg.note;
+}
+
+function setOverlay(key) {
+  activeOverlay = activeOverlay === key ? null : key;
+  renderOverlayUI();
+  for (const k of Object.keys(OVERLAYS)) {
+    const id = `${k}-layer`;
+    if (map.getLayer(id)) {
+      map.setLayoutProperty(id, 'visibility', activeOverlay === k ? 'visible' : 'none');
+    }
+  }
+  // Decoding is async and the first paint can lag the toggle by a beat.
+  map.triggerRepaint();
+  if (activeOverlay) recordOverlaySource(activeOverlay);
+}
+
+for (const key of Object.keys(overlayBtns)) {
+  overlayBtns[key].addEventListener('click', () => setOverlay(key));
+}
+renderOverlayUI();
 
 function routeGeoJSON() {
   if (obActive) {
