@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 # Publish the built app to the gh-pages branch.
 #
-# This is a branch deploy rather than a GitHub Actions workflow because the
-# local gh token lacks the `workflow` scope and cannot push workflow files.
-# To switch to automatic deploys on every push instead, run:
-#
-#     gh auth refresh -s workflow
-#
-# then ask Claude to restore the Actions workflow.
+# NOTE: automatic deploys now run from .github/workflows/pages.yml on every
+# push to main. This script is the manual override — useful for publishing a
+# working tree without committing, or when Actions is unavailable. The two
+# paths publish the same build; the workflow uses the Pages artifact, this one
+# pushes to the gh-pages branch.
 set -euo pipefail
 cd "$(dirname "$0")"
 
