@@ -2,7 +2,7 @@
 // HTML string: alert headlines and zone names come from remote feeds and
 // should never be parsed as markup.
 
-import { compass, slopeBand } from './summary.js';
+import { compass, slopeBand, aqiBand } from './summary.js';
 
 const el = (tag, className, text) => {
   const n = document.createElement(tag);
@@ -26,7 +26,7 @@ function section(parent, title) {
 }
 
 export function renderCard(summary) {
-  const { point, terrain, weather, alerts, avalanche } = summary;
+  const { point, terrain, weather, air, alerts, avalanche } = summary;
   const card = el('div', 'summary-card');
 
   const head = el('div', 'card-head');
@@ -84,6 +84,39 @@ export function renderCard(summary) {
     }
     const precip = (weather.precipIn || []).reduce((a, b) => a + (b || 0), 0);
     if (precip > 0) row(s, 'Precip, 3 day', `${precip.toFixed(2)}"`);
+  }
+
+  // ---------- air quality ----------
+  if (air) {
+    const band = aqiBand(air.aqi);
+    const s = section(card, 'Air quality');
+
+    const r = el('div', 'card-row');
+    r.appendChild(el('span', 'card-label', 'AQI'));
+    const v = el('span', 'card-value aqi-pill', `${air.aqi} — ${band.label}`);
+    v.style.background = band.color;
+    // EPA swatches run from bright yellow to deep maroon, so pick the text
+    // colour off the band rather than assuming a dark pill.
+    v.style.color = air.aqi <= 100 ? '#14161a' : '#ffffff';
+    r.appendChild(v);
+    s.appendChild(r);
+
+    if (air.pm25 !== null && air.pm25 !== undefined) {
+      row(s, 'PM2.5', `${air.pm25.toFixed(1)} µg/m³`);
+    }
+
+    if (air.trend) {
+      const { dir, value, hours } = air.trend;
+      const when = hours <= 1 ? 'within the hour' : `in about ${hours} hours`;
+      row(
+        s,
+        'Trend',
+        `${dir}, ${dir === 'improving' ? 'down' : 'up'} to ${value} ${when}`,
+        dir === 'worsening' ? 'warn' : null
+      );
+    }
+
+    if (band.advice) s.appendChild(el('p', 'card-note' + (air.aqi > 100 ? ' warn' : ''), band.advice));
   }
 
   // ---------- avalanche ----------

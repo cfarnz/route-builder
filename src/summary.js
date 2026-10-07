@@ -109,6 +109,82 @@ async function weather([lon, lat]) {
   };
 }
 
+// ---------- air quality ----------
+// Wildfire smoke is the mountain-west air quality story, and it runs on a
+// daily cycle: smoke settles into valleys overnight and lifts through the
+// morning. A single current number cannot say that, so the forecast hours
+// matter as much as the reading.
+//
+// Open-Meteo's air-quality endpoint is a separate host from the forecast API
+// but the same keyless contract. US AQI is precomputed by the provider rather
+// than derived here, since the EPA breakpoint math is piecewise per pollutant
+// and getting it subtly wrong is worse than not showing it.
+
+// EPA AQI categories. Colors are the published EPA swatches, which people
+// already recognise from purpleair and airnow, so this is one of the few
+// places worth leaving the design system alone.
+const AQI_BANDS = [
+  { max: 50, label: 'Good', color: '#00e400', advice: null },
+  { max: 100, label: 'Moderate', color: '#ffff00', advice: 'Fine for most. Unusually sensitive people may want an easier effort.' },
+  { max: 150, label: 'Unhealthy for sensitive groups', color: '#ff7e00', advice: 'Hard efforts will feel it. Asthma and heart conditions should back off.' },
+  { max: 200, label: 'Unhealthy', color: '#ff0000', advice: 'Everyone feels this on a climb. Shorten it or move it.' },
+  { max: 300, label: 'Very unhealthy', color: '#8f3f97', advice: 'Not a day to train outside.' },
+  { max: Infinity, label: 'Hazardous', color: '#7e0023', advice: 'Stay inside.' },
+];
+
+export const aqiBand = (aqi) =>
+  aqi === null || aqi === undefined ? null : AQI_BANDS.find((b) => aqi <= b.max);
+
+// Look ahead for a meaningfully different reading. Smoke that clears by noon
+// is the useful fact; a flat curve is not worth a line in the card.
+function aqiTrend(hours = [], startIdx = 0) {
+  const next = hours.slice(startIdx, startIdx + 12).filter((v) => v !== null);
+  if (next.length < 4) return null;
+  const now = next[0];
+  const best = Math.min(...next);
+  const worst = Math.max(...next);
+  if (worst - now >= 20) return { dir: 'worsening', value: worst, hours: next.indexOf(worst) };
+  if (now - best >= 20) return { dir: 'improving', value: best, hours: next.indexOf(best) };
+  return null;
+}
+
+async function airQuality([lon, lat]) {
+  const key = `air:${lon.toFixed(2)},${lat.toFixed(2)}`;
+  const hit = await cached(key, TTL.air, async () => {
+    const url =
+      'https://air-quality-api.open-meteo.com/v1/air-quality' +
+      `?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}` +
+      '&current=us_aqi,pm2_5' +
+      '&hourly=us_aqi' +
+      '&forecast_days=2&timezone=auto';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Open-Meteo air quality ${res.status}`);
+    return res.json();
+  });
+
+  record('Air quality', {
+    provider: 'Open-Meteo (CAMS)',
+    detail: 'US AQI + PM2.5',
+    at: hit.fetchedAt,
+    stale: hit.stale,
+    fromCache: hit.fromCache,
+  });
+
+  const cur = hit.value.current || {};
+  if (cur.us_aqi === null || cur.us_aqi === undefined) return null;
+
+  // Align the forecast to the hour the current reading came from, so a cached
+  // response does not report a trend that already happened.
+  const times = hit.value.hourly?.time || [];
+  const idx = Math.max(0, times.indexOf(cur.time));
+
+  return {
+    aqi: Math.round(cur.us_aqi),
+    pm25: cur.pm2_5,
+    trend: aqiTrend(hit.value.hourly?.us_aqi, idx),
+  };
+}
+
 // ---------- active alerts ----------
 async function alerts([lon, lat]) {
   const key = `alerts:${lon.toFixed(2)},${lat.toFixed(2)}`;
@@ -191,11 +267,12 @@ async function avalanche(pt) {
 // Every provider runs in parallel and failures degrade to null.
 export async function locationSummary(pt) {
   const settle = (p) => p.catch(() => null);
-  const [t, w, al, av] = await Promise.all([
+  const [t, w, aq, al, av] = await Promise.all([
     settle(terrain(pt)),
     settle(weather(pt)),
+    settle(airQuality(pt)),
     settle(alerts(pt)),
     settle(avalanche(pt)),
   ]);
-  return { point: pt, terrain: t, weather: w, alerts: al, avalanche: av };
+  return { point: pt, terrain: t, weather: w, air: aq, alerts: al, avalanche: av };
 }

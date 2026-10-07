@@ -275,6 +275,15 @@ button.active, .chip.active {
 .card-row.warn .card-value { color: var(--warn-text); }
 .card-row.danger .card-value { color: var(--danger-text); }
 .danger-pill { padding: 0 7px; border-radius: 4px; background: var(--bg-0); }
+
+/* AQI pill: background and text colour are set inline from the EPA band, since
+   the swatches are the one place this app deliberately leaves the design
+   system alone — people already read these colours from AirNow and PurpleAir. */
+.aqi-pill {
+  padding: 0 7px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
 .card-note { color: var(--text-dim); font-size: 10.5px; margin-top: 5px; }
 .card-note.warn { color: var(--warn-text); }
 .card-note.danger { color: var(--danger-text); }

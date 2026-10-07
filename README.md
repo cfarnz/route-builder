@@ -24,7 +24,14 @@ fighting someone else's app.
   key) and both are computed per pixel in the browser through a custom MapLibre protocol, since
   MapLibre ships hillshade but nothing that colours by angle or direction
 - **Inspect a point** — tap anywhere for a single card: elevation, slope angle, aspect, current
-  weather and 3-day precip, active NWS alerts, and the CAIC avalanche zone and danger rating.
+  weather and 3-day precip, **air quality**, active NWS alerts, and the CAIC avalanche zone and
+  danger rating.
+- **Air quality** — US AQI and PM2.5 with the EPA colour band, plus a trend line when the next
+  twelve hours differ meaningfully from now. Wildfire smoke in the mountain west runs on a daily
+  cycle, settling into valleys overnight and lifting through the morning, so the forecast is what
+  tells you to start at seven instead of ten. AQI is taken as published rather than derived from
+  pollutant concentrations, since the EPA breakpoint maths is piecewise per pollutant and a subtle
+  error is worse than no number.
   Slopes in the 30–45° band get flagged, since that's where most slab avalanches release
 - **Geography-aware elevation** — a resolver picks the provider by location and by what the
   caller needs. Summary cards get USGS 3DEP at 1 m (US only, one point per request); routes and
@@ -54,8 +61,13 @@ Vite + vanilla JS + [MapLibre GL](https://maplibre.org/). Routing and elevation 
 services: [BRouter](https://brouter.de) (mountain-hiking profile — returns elevation per point),
 [Overpass API](https://overpass-api.de) (trailhead search), [Open-Meteo](https://open-meteo.com)
 (bulk elevation), [USGS 3DEP](https://epqs.nationalmap.gov) (1 m elevation for summary cards),
-[NWS](https://api.weather.gov) (active alerts), and the
-[National Avalanche Center API](https://api.avalanche.org) (CAIC zones and danger).
+[NWS](https://api.weather.gov) (active alerts), the
+[National Avalanche Center API](https://api.avalanche.org) (CAIC zones and danger), and
+[Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api) (US AQI and PM2.5, from
+CAMS). **Every one of these is keyless.** That constraint is deliberate: a browser app with no
+backend cannot hold a secret, so an API needing a key would mean either publishing it or standing
+up a proxy, and both defeat the point. IQAir was considered for air quality and rejected on exactly
+that basis.
 MapLibre was chosen over Leaflet for raster-DEM support —
 slope-angle and aspect overlays are on the roadmap.
 
