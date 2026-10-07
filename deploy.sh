@@ -42,4 +42,11 @@ else
 fi
 
 git worktree remove --force "$WORKTREE"
+
+# Rebuild without the Pages base path so a locally served dist still works.
+# Without this, dist/index.html keeps asking for /route-builder/assets/... and
+# any plain `python3 -m http.server dist` serves a blank page.
+echo "Restoring a local-path build in dist/..."
+npm run build >/dev/null
+
 echo "Live at https://cfarnz.github.io/route-builder/"

@@ -6,7 +6,7 @@ import { downloadGPX } from './gpx.js';
 import { Profile } from './profile.js';
 import { listRoutes, saveRoute, deleteRoute } from './storage.js';
 import { discover, effortBucket } from './discover.js';
-import { onChange, ago } from './provenance.js';
+import { onChange, ago, record } from './provenance.js';
 import { cacheStats, clearCache } from './cache.js';
 import { locationSummary } from './summary.js';
 import { renderCard } from './card.js';
@@ -15,6 +15,7 @@ import {
   recordOverlaySource,
   OVERLAYS,
   OVERLAY_MAXZOOM,
+  TERRARIUM_TILES,
 } from './slope.js';
 
 registerOverlayProtocols();
@@ -47,6 +48,7 @@ const map = new maplibregl.Map({
   style: styleFor('opentopo'),
   center: [-105.28, 39.995], // Boulder — Chautauqua-ish
   zoom: 12,
+  maxPitch: 80, // terrain is worth leaning into; the default 60 flattens ridgelines
 });
 map.addControl(new maplibregl.NavigationControl(), 'top-left');
 map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }));
@@ -182,6 +184,59 @@ for (const key of Object.keys(overlayBtns)) {
   overlayBtns[key].addEventListener('click', () => setOverlay(key));
 }
 renderOverlayUI();
+
+// ---------- 3D terrain ----------
+// MapLibre reads Terrarium elevation natively, so the same AWS tiles the slope
+// and aspect overlays decode by hand can drive real terrain with no second
+// source and no key. Raster basemaps drape over it, which means the topo lines
+// bend across the relief rather than sitting flat on top of it.
+//
+// Terrain is a style property, so switching basemaps drops it. The styledata
+// handler puts it back.
+let terrain3d = false;
+const EXAGGERATION = 1.4; // true scale reads oddly flat on a screen this size
+const terrainBtn = $('btn-3d');
+const terrainNote = $('terrain-note');
+
+function ensureTerrainSource() {
+  if (map.getSource('dem')) return;
+  map.addSource('dem', {
+    type: 'raster-dem',
+    tiles: [TERRARIUM_TILES],
+    encoding: 'terrarium',
+    tileSize: 256,
+    maxzoom: OVERLAY_MAXZOOM,
+    attribution:
+      'Terrain from <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a>',
+  });
+}
+
+function applyTerrain() {
+  if (!map.isStyleLoaded()) return;
+  ensureTerrainSource();
+  map.setTerrain(terrain3d ? { source: 'dem', exaggeration: EXAGGERATION } : null);
+}
+
+function setTerrain3D(on) {
+  terrain3d = on;
+  terrainBtn.classList.toggle('on', on);
+  terrainNote.hidden = !on;
+  terrainNote.textContent = on
+    ? `Vertical exaggeration ${EXAGGERATION}x. Drag with two fingers, or right-drag, to tilt and spin.`
+    : '';
+  applyTerrain();
+  // Flat-on gives no sense of relief, so lean the camera over when turning it
+  // on and sit back up when turning it off.
+  map.easeTo({ pitch: on ? 62 : 0, bearing: on ? map.getBearing() : 0, duration: 600 });
+  if (on) recordTerrainSource();
+}
+
+function recordTerrainSource() {
+  record('Terrain', { provider: 'AWS Terrain Tiles', detail: `Terrarium DEM · ${EXAGGERATION}x` });
+}
+
+terrainBtn.addEventListener('click', () => setTerrain3D(!terrain3d));
+map.on('styledata', applyTerrain); // basemap switches drop terrain; restore it
 
 function routeGeoJSON() {
   if (obActive) {

@@ -17,6 +17,11 @@ const HOST = 's3.amazonaws.com/elevation-tiles-prod/terrarium';
 // interpolation, so let MapLibre overzoom rather than inventing terrain.
 export const OVERLAY_MAXZOOM = 14;
 
+// The same Terrarium tiles the overlays decode also drive MapLibre's 3D
+// terrain, which reads Terrarium natively. Exported so main.js can build a
+// raster-dem source without repeating the host.
+export const TERRARIUM_TILES = `https://${HOST}/{z}/{x}/{y}.png`;
+
 const TILE_RE = /\/(\d+)\/(\d+)\/(\d+)\.png$/;
 const ALPHA = 120; // ~47%, enough to read contours through
 
