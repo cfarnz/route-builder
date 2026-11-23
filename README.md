@@ -7,69 +7,74 @@ fighting someone else's app.
 ## What it does
 
 - **Click-to-build routes** that snap to real trails (topo basemaps: OpenTopoMap + USGS)
-- **Off-trail fallback** — where no trail exists, segments go straight-line (dashed) with real
+- **Off-trail fallback:** where no trail exists, segments go straight-line (dashed) with real
   elevation sampled along them, so alpine ridge links still work
-- **Distance slider** — set a target; an out-and-back mode mirrors the route home and the slider
+- **Distance slider:** set a target; an out-and-back mode mirrors the route home and the slider
   moves the turnaround point live
-- **Discover** — finds real trailheads near you (up to 120 mi), generates loop candidates from
+- **Discover:** finds real trailheads near you (up to 120 mi), generates loop candidates from
   each, and filters by distance, difficulty, and high point. A ⛰ mountains-only toggle keeps
   only trailheads above 8,000 ft
 - **Elevation profile** with hover sync to the map; live distance/gain stats
-- **GPX export** (with per-point elevation) — imports clean into COROS, Gaia, etc.
+- **GPX export** (with per-point elevation): imports clean into COROS, Gaia, etc.
 - **Saved routes** in localStorage. No backend, no accounts, no API keys.
-- **Terrain overlays** — slope angle and aspect, one at a time. Slope puts the loudest colours on
+- **Terrain overlays:** slope angle and aspect, one at a time. Slope puts the loudest colours on
   the 30–45° slab-avalanche band and leaves anything under 27° clear; aspect colours eight compass
   sectors on a wheel so opposing faces read as opposing colours, on slopes over 20°. Elevation
   tiles come from [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Terrarium, no
   key) and both are computed per pixel in the browser through a custom MapLibre protocol, since
   MapLibre ships hillshade but nothing that colours by angle or direction
-- **Inspect a point** — tap anywhere for a single card: elevation, slope angle, aspect, current
+- **Inspect a point:** tap anywhere for a single card: elevation, slope angle, aspect, current
   weather and 3-day precip, **air quality**, active NWS alerts, and the CAIC avalanche zone and
   danger rating.
-- **Air quality** — US AQI and PM2.5 with the EPA colour band, plus a trend line when the next
+- **Air quality:** US AQI and PM2.5 with the EPA colour band, plus a trend line when the next
   twelve hours differ meaningfully from now. Wildfire smoke in the mountain west runs on a daily
   cycle, settling into valleys overnight and lifting through the morning, so the forecast is what
   tells you to start at seven instead of ten. AQI is taken as published rather than derived from
   pollutant concentrations, since the EPA breakpoint maths is piecewise per pollutant and a subtle
   error is worse than no number.
   Slopes in the 30–45° band get flagged, since that's where most slab avalanches release
-- **Geography-aware elevation** — a resolver picks the provider by location and by what the
+- **Geography-aware elevation:** a resolver picks the provider by location and by what the
   caller needs. Summary cards get USGS 3DEP at 1 m (US only, one point per request); routes and
   Discover get Open-Meteo at ~90 m (global, 100 points per request). 3DEP failures fall back
   per-point rather than emptying the card
-- **Cached providers** — elevation points are cached indefinitely (terrain doesn't move),
+- **Cached providers:** elevation points are cached indefinitely (terrain doesn't move),
   trailhead queries for a week. When a source goes down, the last good answer is served with
   its age shown rather than an error.
-- **Data sources panel** — every provider reports what answered, how much came from cache, and
+- **Data sources panel:** every provider reports what answered, how much came from cache, and
   how fresh it was. Green = live, blue = cached, amber = stale.
 
 ## Design
 
-Built on [clay-ui](https://github.com/cfarnz/clay-ui) ("Field Instrument") — `src/tokens.css` is
+Built on [clay-ui](https://github.com/cfarnz/clay-ui) ("Field Instrument"): `src/tokens.css` is
 a copy from that repo. Every color, duration, spacing and radius comes from a token; a raw hex in
 `style.css` is a bug. Measurements render in tabular monospace so digits hold their column as
 values change.
 
 ## Difficulty scoring
 
-`effort = miles + (elevation gain in feet / 500)` — a flat 10-miler ≈ 10, a 7-miler with
+`effort = miles + (elevation gain in feet / 500)`. A flat 10-miler ≈ 10, a 7-miler with
 3,500 ft ≈ 14. Bucketed: Easy < 8, Moderate 8–14, Hard 14–20, Very Hard 20+.
 
 ## Stack
 
-Vite + vanilla JS + [MapLibre GL](https://maplibre.org/). Routing and elevation from free public
-services: [BRouter](https://brouter.de) (mountain-hiking profile — returns elevation per point),
-[Overpass API](https://overpass-api.de) (trailhead search), [Open-Meteo](https://open-meteo.com)
-(bulk elevation), [USGS 3DEP](https://epqs.nationalmap.gov) (1 m elevation for summary cards),
-[NWS](https://api.weather.gov) (active alerts), the
-[National Avalanche Center API](https://api.avalanche.org) (CAIC zones and danger), and
-[Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api) (US AQI and PM2.5, from
-CAMS). **Every one of these is keyless.** That constraint is deliberate: a browser app with no
+Vite + vanilla JS + [MapLibre GL](https://maplibre.org/). Routing, elevation, and conditions come
+from free public services:
+
+- [BRouter](https://brouter.de): routing on a mountain-hiking profile, with elevation per point
+- [Overpass API](https://overpass-api.de): trailhead search
+- [Open-Meteo](https://open-meteo.com): bulk elevation
+- [USGS 3DEP](https://epqs.nationalmap.gov): 1 m elevation for summary cards
+- [NWS](https://api.weather.gov): active alerts
+- [National Avalanche Center API](https://api.avalanche.org): CAIC zones and danger
+- [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api): US AQI and PM2.5, from CAMS
+
+**Every one of these is keyless.** That constraint is deliberate: a browser app with no
 backend cannot hold a secret, so an API needing a key would mean either publishing it or standing
 up a proxy, and both defeat the point. IQAir was considered for air quality and rejected on exactly
 that basis.
-MapLibre was chosen over Leaflet for raster-DEM support —
-slope-angle and aspect overlays are on the roadmap.
+
+MapLibre was chosen over Leaflet for raster-DEM support, which the slope-angle and aspect
+overlays depend on.
 
 ## Run it
 
@@ -83,11 +88,11 @@ npm run dev     # → http://localhost:5173
 The code was the easy part. Two bugs only surfaced against real terrain:
 
 1. **Loop overshoot.** Generating loops by placing routing via-points on a circle sized from
-   geometry produced loops 1.5–8× the target distance — mountain trail networks stretch routes
+   geometry produced loops 1.5–8× the target distance. Mountain trail networks stretch routes
    far beyond what a circle predicts. Fix: route, measure, scale the circle by target/actual,
    retry. An 8-mile target now lands within ~10–20%.
 2. **Nearest-trailhead bias.** The trailhead search sorted by distance and took the closest five,
-   so a 118-mile search radius still returned only city routes. Fix: stratified sampling — one
+   so a 118-mile search radius still returned only city routes. Fix: stratified sampling, one
    random trailhead per distance band, near to far.
 
 ## Roadmap
